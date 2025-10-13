@@ -4,6 +4,27 @@
 
 Natural language browser automation. Query DOM elements using plain English.
 
+## Installation
+
+Install from PyPI:
+
+```bash
+pip install natural-selector
+```
+
+With optional dependencies:
+
+```bash
+# For default sentence-transformer embedder
+pip install natural-selector[default-embedder]
+
+# For OpenAI integration
+pip install natural-selector[openai]
+
+# Install all optional dependencies
+pip install natural-selector[default-embedder,openai]
+```
+
 ## Quick Example
 
 ```python
