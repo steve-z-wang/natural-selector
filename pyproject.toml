@@ -11,7 +11,7 @@ requires-python = ">=3.8"
 license = {text = "MIT"}
 keywords = ["selector", "dom", "natural-language", "browser-automation", "html"]
 authors = [
-    {name = "Your Name", email = "your.email@example.com"}
+    {name = "Steve Wang", email = "stevewang.at.work@gmail.com"}
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",
