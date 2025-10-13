@@ -1,25 +1,38 @@
 # Natural Selector
 
-A natural language HTML selector engine that lets you query DOM elements using plain English instead of CSS selectors or XPath.
+⚠️ **Under Active Development - Not Production Ready**
 
-## Concept
+Natural language browser automation. Query DOM elements using plain English.
 
-```javascript
-// Instead of this:
-const button = document.querySelector('#user-profile > div.actions > button:nth-child(2)');
+## Quick Example
 
-// Do this:
-const button = naturalSelector(html, 'the red logout button');
+```python
+from natural_selector import NaturalSelector
+from natural_selector.integrations import OpenAILLM
+
+# Create selector
+selector = NaturalSelector(llm=OpenAILLM())
+
+# Query with natural language
+xpaths = selector.select(cdp_snapshot, "search button")
+# Returns: ['(//input[@name="btnK"])[1]']
 ```
+
+## How it Works
+
+1. Capture DOM via Chrome DevTools Protocol
+2. Filter invisible/non-semantic elements
+3. Create embeddings and semantic search
+4. LLM identifies elements from context
+5. Generate guaranteed unique XPath selectors
 
 ## Features
 
-- Natural language element selection
-- Works with static HTML or Chrome DevTools Protocol (CDP)
-- Drop-in replacement for traditional selectors
-- More resilient to DOM changes
-- Perfect for LLM-powered browser automation
+- Natural language queries
+- Guaranteed unique XPath selectors
+- Automatic filtering of hidden elements
+- Customizable LLMs and embedders
 
 ## Status
 
-🚧 Under development
+🚧 **In Development** - Testing phase, API may change
