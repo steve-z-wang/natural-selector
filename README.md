@@ -76,6 +76,12 @@ Natural Selector uses a multi-stage pipeline to find elements:
 
 - [ ] HTML adapter (alternative to CDP for static HTML)
 - [ ] Test with Mind2Web dataset
+- [ ] Error handling & retry logic (LLM/embedding failures, timeouts)
+- [ ] Selector validation (verify generated selectors work on page)
+- [ ] Performance optimization (async operations, parallelization)
+- [ ] Conditional RAG (skip embeddings for small DOMs, use direct LLM)
+- [ ] More selector output formats (CSS variations, data-testid, etc.)
+- [ ] Add tests (unit tests, integration tests)
 
 ## Status
 
