@@ -18,7 +18,8 @@ class LLM(ABC):
         Args:
             query: User's natural language query
             context: Context text (markdown chunks)
-            system_prompt: Optional system prompt
+            system_prompt: System prompt defining the task
+                          (PageIndex provides this for element selection)
 
         Returns:
             Generated element ID (e.g., "button-1" or "button-1, input-2")

@@ -1,15 +1,15 @@
 """CDP (Chrome DevTools Protocol) snapshot parser.
 
-Parses CDP DOMSnapshot.captureSnapshot responses into Full IR.
+Parses CDP DOMSnapshot.captureSnapshot responses into DomIR.
 """
 
 from typing import Dict, List, Optional, Any
-from ..ir.nodes import ElementNode, TextNode, BoundingBox, IR
+from ..ir.dom_ir import DomElement, DomText, DomTreeNode, BoundingBox, DomIR
 
 
-def parse_cdp_snapshot(snapshot_data: Dict[str, Any]) -> IR:
+def parse_cdp_snapshot(snapshot_data: Dict[str, Any]) -> DomIR:
     """
-    Parse CDP DOMSnapshot response into Full IR.
+    Parse CDP DOMSnapshot response into DomIR.
 
     Args:
         snapshot_data: CDP DOMSnapshot.captureSnapshot response with:
@@ -17,15 +17,16 @@ def parse_cdp_snapshot(snapshot_data: Dict[str, Any]) -> IR:
             - strings: Shared string table
 
     Returns:
-        IR: Full IR with complete tree structure
+        DomIR: Complete DOM tree with all CDP data
     """
     documents_data = snapshot_data.get('documents', [])
     strings = snapshot_data.get('strings', [])
 
     if not documents_data:
         # Empty document
-        root = ElementNode(tag="html", cdp_index=0)
-        return IR(root)
+        root_element = DomElement(tag="html", cdp_index=0)
+        root_tree_node = DomTreeNode(data=root_element)
+        return DomIR(root_tree_node)
 
     # Parse first document
     document_data = documents_data[0]
@@ -71,8 +72,8 @@ def parse_cdp_snapshot(snapshot_data: Dict[str, Any]) -> IR:
 
         layout_map[node_idx] = (bounds, styles)
 
-    # Create ElementNodes (first pass)
-    element_nodes: List[Optional[ElementNode]] = []
+    # Create DomElements and DomTreeNodes (first pass)
+    tree_nodes: List[Optional[DomTreeNode]] = []
     num_nodes = len(node_types)
 
     for i in range(num_nodes):
@@ -96,21 +97,24 @@ def parse_cdp_snapshot(snapshot_data: Dict[str, Any]) -> IR:
             # Get layout data
             bounds, styles = layout_map.get(i, (None, {}))
 
-            # Create ElementNode
-            node = ElementNode(
+            # Create DomElement (data only)
+            element = DomElement(
                 tag=tag_name,
                 cdp_index=i,
                 attributes=node_attrs,
                 styles=styles,
                 bounds=bounds
             )
-            element_nodes.append(node)
+
+            # Create DomTreeNode wrapping the element
+            tree_node = DomTreeNode(data=element)
+            tree_nodes.append(tree_node)
         else:
             # Text node or other - placeholder
-            element_nodes.append(None)
+            tree_nodes.append(None)
 
     # Build tree relationships (second pass)
-    root_node = None
+    root_tree_node = None
 
     for i in range(num_nodes):
         node_type = node_types[i] if i < len(node_types) else 0
@@ -118,41 +122,45 @@ def parse_cdp_snapshot(snapshot_data: Dict[str, Any]) -> IR:
         # Handle text nodes
         if node_type == 3:  # Text node
             parent_idx = parent_indices[i] if i < len(parent_indices) else None
-            if parent_idx is not None and 0 <= parent_idx < len(element_nodes):
-                parent_node = element_nodes[parent_idx]
-                if parent_node:
+            if parent_idx is not None and 0 <= parent_idx < len(tree_nodes):
+                parent_tree_node = tree_nodes[parent_idx]
+                if parent_tree_node:
                     node_value_idx = node_values[i] if i < len(node_values) else None
                     text_content = get_string(node_value_idx) if node_value_idx is not None else ""
                     if text_content.strip():
-                        parent_node.add_child(TextNode(text=text_content))
+                        # Create DomText and wrap in DomTreeNode
+                        text = DomText(text=text_content)
+                        text_tree_node = DomTreeNode(data=text)
+                        parent_tree_node.add_child(text_tree_node)  # Sets parent automatically
             continue
 
         # Handle element nodes
-        current_node = element_nodes[i]
-        if current_node is None:
+        current_tree_node = tree_nodes[i]
+        if current_tree_node is None:
             continue
 
         # Link to parent
         parent_idx = parent_indices[i] if i < len(parent_indices) else None
         if parent_idx is not None and parent_idx != -1:
-            if 0 <= parent_idx < len(element_nodes):
-                parent_node = element_nodes[parent_idx]
-                if parent_node:
-                    parent_node.add_child(current_node)
+            if 0 <= parent_idx < len(tree_nodes):
+                parent_tree_node = tree_nodes[parent_idx]
+                if parent_tree_node:
+                    parent_tree_node.add_child(current_tree_node)  # Sets parent automatically
         else:
             # Root node (parentIndex is -1 or None)
-            if root_node is None:
-                root_node = current_node
+            if root_tree_node is None:
+                root_tree_node = current_tree_node
 
     # Fallback to first element if no root found
-    if root_node is None:
-        for node in element_nodes:
-            if node is not None:
-                root_node = node
+    if root_tree_node is None:
+        for tree_node in tree_nodes:
+            if tree_node is not None:
+                root_tree_node = tree_node
                 break
 
     # Final fallback
-    if root_node is None:
-        root_node = ElementNode(tag="html", cdp_index=0)
+    if root_tree_node is None:
+        root_element = DomElement(tag="html", cdp_index=0)
+        root_tree_node = DomTreeNode(data=root_element)
 
-    return IR(root_node)
+    return DomIR(root_tree_node)

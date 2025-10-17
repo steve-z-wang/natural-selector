@@ -43,26 +43,14 @@ class OpenAILLM(LLM):
 
     def generate(self, query: str, context: str, system_prompt: Optional[str] = None) -> str:
         """Generate response using OpenAI."""
-        # Default system prompt
-        if system_prompt is None:
-            system_prompt = """You are a browser automation assistant. Given a webpage's semantic structure
-and a user query, identify the relevant element ID.
-
-The context shows the webpage structure in markdown format with element IDs like:
-- button-1, div-2, input-3, etc.
-
-IMPORTANT: Only return the element ID(s), nothing else.
-- For single element: just "button-1"
-- For multiple elements: "button-1, input-2, div-3"
-- If not found: "NOT_FOUND"
-
-Do not include explanations, just the ID."""
-
         # Create messages
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": f"Webpage Context:\n{context}\n\nQuery: {query}"}
-        ]
+        messages = []
+
+        # Add system prompt if provided
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+
+        messages.append({"role": "user", "content": f"Webpage Context:\n{context}\n\nQuery: {query}"})
 
         # Call OpenAI
         response = self.client.chat.completions.create(
