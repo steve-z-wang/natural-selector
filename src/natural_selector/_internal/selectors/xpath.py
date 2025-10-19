@@ -1,8 +1,8 @@
 """Generate XPath selectors from element IDs."""
 
 from typing import Dict, Optional, List
-from ..ir.dom_ir import DomTreeNode, DomElement
-from ..ir.semantic_ir import SemanticElement
+from domcontext._internal.ir.dom_ir import DomTreeNode, DomElement
+from domcontext._internal.ir.semantic_ir import SemanticElement
 
 
 def generate_xpath(element_id: str, id_mapping: Dict[str, SemanticElement], dom_tree_node: DomTreeNode) -> Optional[str]:

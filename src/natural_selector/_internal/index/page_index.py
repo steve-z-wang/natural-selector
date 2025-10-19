@@ -1,7 +1,7 @@
 """Page index - holds all indexed data for a semantic IR."""
 
 from typing import List
-from ..ir.semantic_ir import SemanticIR
+from domcontext._internal.ir.semantic_ir import SemanticIR
 from ...interfaces import Embedder, LLM
 from .chunker import Chunk
 

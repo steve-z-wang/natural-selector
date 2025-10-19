@@ -1,7 +1,7 @@
 """Page class - parsed page with cached IR and embeddings."""
 
 from typing import List, Optional
-from ._internal.ir.semantic_ir import SemanticIR
+from domcontext._internal.ir.semantic_ir import SemanticIR
 from ._internal.index.page_index import PageIndex
 from .element import SelectedElement
 from .interfaces import Embedder, LLM
@@ -124,6 +124,76 @@ class Page:
         """
         results = self.select(query)
         return results[0] if results else None
+
+    def get_formatted_page(self, format: str = "markdown") -> str:
+        """
+        Get formatted representation of the page structure.
+
+        Args:
+            format: "markdown" or "json"
+
+        Returns:
+            Formatted string representation of the page
+
+        Example:
+            >>> print(page.get_formatted_page())
+            - body
+              - nav (role="navigation")
+                - a (href="/about")
+                  - "About"
+        """
+        if format == "markdown":
+            return self._to_markdown()
+        elif format == "json":
+            import json
+            return json.dumps(self._to_json(), indent=2)
+        else:
+            raise ValueError(f"Format must be 'markdown' or 'json', got: {format}")
+
+    def _to_markdown(self) -> str:
+        """Convert semantic IR to markdown format."""
+        from domcontext._internal.ir.semantic_ir import SemanticElement
+
+        lines = []
+        for node, depth in self._semantic_ir.dfs(with_depth=True):
+            indent = "  " * depth
+
+            if isinstance(node.data, SemanticElement):
+                elem = node.data
+                # Tag + attributes
+                if elem.semantic_attributes:
+                    attrs = " ".join(f'{k}="{v}"' for k, v in elem.semantic_attributes.items())
+                    lines.append(f"{indent}- {elem.tag} ({attrs})")
+                else:
+                    lines.append(f"{indent}- {elem.tag}")
+            else:
+                # Text node
+                lines.append(f'{indent}- "{node.data.text}"')
+
+        return "\n".join(lines)
+
+    def _to_json(self) -> dict:
+        """Convert semantic IR to JSON format."""
+        from domcontext._internal.ir.semantic_ir import SemanticElement, SemanticTreeNode
+
+        def node_to_dict(node: SemanticTreeNode) -> dict:
+            if isinstance(node.data, SemanticElement):
+                return {
+                    'type': 'element',
+                    'tag': node.data.tag,
+                    'attributes': node.data.semantic_attributes,
+                    'children': [node_to_dict(child) for child in node.children]
+                }
+            else:
+                return {
+                    'type': 'text',
+                    'text': node.data.text
+                }
+
+        return {
+            'root': node_to_dict(self._semantic_ir.root),
+            'total_elements': len(self._semantic_ir.all_element_nodes())
+        }
 
     def __repr__(self) -> str:
         return f"Page(semantic_ir={self._semantic_ir})"

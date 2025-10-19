@@ -1,6 +1,7 @@
 """Public API for natural-selector."""
 
 from typing import Dict, Optional, List
+from domcontext import DomContext
 from .interfaces import Embedder, LLM
 
 
@@ -59,34 +60,27 @@ class Session:
         else:
             self.embedder = embedder
 
-    def _create_page_from_dom_ir(self, dom_ir: 'DomIR') -> 'Page':
+    def _create_page_from_dom_context(self, dom_context: DomContext) -> 'Page':
         """
-        Internal: Create Page from DomIR through filtering pipeline.
+        Internal: Create Page from DomContext.
 
         Args:
-            dom_ir: DomIR to process
+            dom_context: DomContext with parsed and filtered DOM
 
         Returns:
             Page object ready for querying
 
         Raises:
-            ValueError: If no visible or semantic elements found
+            ValueError: If no semantic elements found
         """
-        from ._internal.filters import visibility_pass, semantic_pass
         from .page import Page
 
-        # Apply visibility filter (DomIR → DomIR)
-        visible_dom_ir = visibility_pass(dom_ir)
-        if not visible_dom_ir:
-            raise ValueError("No visible elements found")
-
-        # Apply semantic filter (DomIR → SemanticIR)
-        semantic_ir = semantic_pass(visible_dom_ir)
+        # Extract semantic_ir from DomContext (internal API)
+        semantic_ir = dom_context._semantic_ir
         if not semantic_ir:
             raise ValueError("No semantic elements found")
 
         # Create and return Page (index built lazily on first query!)
-        # Note: DomIR access is via SemanticElement.dom_tree_node references
         return Page(
             semantic_ir=semantic_ir,
             embedder=self.embedder,
@@ -103,7 +97,7 @@ class Session:
         Parses HTML and creates a Page object with cached embeddings.
 
         Args:
-            html: HTML string
+            html: HTML string (supports backend_node_id attributes from Mind2Web)
 
         Returns:
             Page object ready for querying
@@ -112,11 +106,19 @@ class Session:
             >>> page = session.create_page_from_html(html_string)
             >>> element = page.select_one("search button")
         """
-        # TODO: Implement HTML parser
-        # from ._internal.parsers.html_parser import parse_html
-        # dom_ir = parse_html(html)
-        # return self._create_page_from_dom_ir(dom_ir)
-        raise NotImplementedError("HTML parser not yet implemented. Use create_page_from_cdp() for now.")
+        # Use DomContext.from_html() with all filters enabled
+        dom_context = DomContext.from_html(
+            html,
+            filter_non_visible_tags=True,
+            filter_css_hidden=True,
+            filter_zero_dimensions=True,
+            filter_attributes=True,
+            filter_empty=True,
+            collapse_wrappers=True
+        )
+
+        # Create Page from DomContext
+        return self._create_page_from_dom_context(dom_context)
 
     def create_page_from_cdp(self, cdp_snapshot: Dict) -> 'Page':
         """
@@ -135,10 +137,16 @@ class Session:
             >>> page = session.create_page_from_cdp(snapshot)
             >>> element = page.select_one("search button")
         """
-        from ._internal.parsers.cdp_parser import parse_cdp_snapshot
+        # Use DomContext.from_cdp() with all filters enabled
+        dom_context = DomContext.from_cdp(
+            cdp_snapshot,
+            filter_non_visible_tags=True,
+            filter_css_hidden=True,
+            filter_zero_dimensions=True,
+            filter_attributes=True,
+            filter_empty=True,
+            collapse_wrappers=True
+        )
 
-        # Parse CDP snapshot to DomIR
-        dom_ir = parse_cdp_snapshot(cdp_snapshot)
-
-        # Apply filtering pipeline and create Page
-        return self._create_page_from_dom_ir(dom_ir)
+        # Create Page from DomContext
+        return self._create_page_from_dom_context(dom_context)

@@ -2,8 +2,8 @@
 
 from dataclasses import dataclass
 from typing import Optional, Dict
-from ._internal.ir.dom_ir import DomTreeNode, DomElement
-from ._internal.ir.semantic_ir import SemanticElement
+from domcontext._internal.ir.dom_ir import DomTreeNode, DomElement
+from domcontext._internal.ir.semantic_ir import SemanticElement
 
 
 @dataclass
@@ -120,7 +120,7 @@ class SelectedElement:
     @property
     def text(self) -> Optional[str]:
         """Element text content."""
-        from ._internal.ir.dom_ir import DomText
+        from domcontext._internal.ir.dom_ir import DomText
 
         # Collect all text from this node and descendants
         texts = []
