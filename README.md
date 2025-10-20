@@ -1,6 +1,10 @@
 # Natural Selector
 
-⚠️ **Under Active Development - Not Production Ready**
+> ⚠️ **DEPRECATED**: This package has been merged into [webtask](https://github.com/steve-z-wang/webtask).
+>
+> Please use `pip install webtask` instead.
+
+---
 
 Natural language browser automation. Query DOM elements using plain English.
 
