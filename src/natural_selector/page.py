@@ -1,15 +1,15 @@
-"""Page class - parsed page with cached IR and embeddings."""
+"""Page class - parsed page with cached element embeddings."""
 
-from typing import List, Optional
-from domcontext._internal.ir.semantic_ir import SemanticIR
-from ._internal.index.page_index import PageIndex
+from typing import List, Optional, Dict
+from domnode import Node
+from ._internal.page_index import PageIndex
 from .element import SelectedElement
 from .interfaces import Embedder, LLM
 
 
 class Page:
     """
-    Parsed page with cached IR and embeddings.
+    Parsed page with cached element embeddings.
 
     Allows multiple queries on the same page without recomputing embeddings.
 
@@ -27,33 +27,29 @@ class Page:
 
     def __init__(
         self,
-        semantic_ir: SemanticIR,
+        root: Node,
+        id_mapping: Dict[str, Node],
         embedder: Embedder,
         llm: LLM,
-        chunk_size: int = 500,
-        chunk_overlap: int = 50,
         default_top_k: int = 5
     ):
         """
-        Initialize Page with SemanticIR and configuration.
+        Initialize Page with Node tree and configuration.
 
         Args:
-            semantic_ir: SemanticIR (for element resolution)
+            root: Filtered Node tree with semantic IDs
+            id_mapping: Mapping from semantic_id to Node
             embedder: Embedder for building index
             llm: LLM for query resolution
-            chunk_size: Maximum tokens per chunk
-            chunk_overlap: Overlap between chunks
-            default_top_k: Default number of chunks for RAG context
+            default_top_k: Default number of elements for RAG context
 
         Note:
-            - DomIR access is via SemanticElement.dom_tree_node references
             - Index built lazily on first query (expensive operation!)
         """
-        self._semantic_ir = semantic_ir
+        self._root = root
+        self._id_mapping = id_mapping
         self._embedder = embedder
         self._llm = llm
-        self._chunk_size = chunk_size
-        self._chunk_overlap = chunk_overlap
         self._default_top_k = default_top_k
         self._index: Optional[PageIndex] = None  # Built lazily on first query!
 
@@ -75,12 +71,11 @@ class Page:
         """
         # Build index lazily on first query (expensive operation!)
         if self._index is None:
-            self._index = PageIndex.from_semantic_ir(
-                self._semantic_ir,
+            self._index = PageIndex.from_node_tree(
+                self._root,
+                self._id_mapping,
                 embedder=self._embedder,
                 llm=self._llm,
-                chunk_size=self._chunk_size,
-                chunk_overlap=self._chunk_overlap
             )
 
         # Query index for element IDs (vector search + LLM)
@@ -90,18 +85,17 @@ class Page:
         if not element_ids:
             return []
 
-        # Map IDs to DomTreeNodes via SemanticIR
+        # Map IDs to Nodes
         selected_elements = []
         for rank, element_id in enumerate(element_ids, start=1):
-            # Use SemanticIR to get element by ID
-            semantic_element = self._semantic_ir.get_element_by_id(element_id)
-            if semantic_element and semantic_element.dom_tree_node:
+            node = self._id_mapping.get(element_id)
+            if node is not None:
                 selected = SelectedElement(
                     element_id=element_id,
-                    dom_tree_node=semantic_element.dom_tree_node,
+                    node=node,
                     confidence=1.0 / rank,  # Simple confidence based on rank
                     rank=rank,
-                    id_mapping=self._semantic_ir.get_all_elements_with_ids()
+                    id_mapping=self._id_mapping
                 )
                 selected_elements.append(selected)
 
@@ -137,9 +131,9 @@ class Page:
 
         Example:
             >>> print(page.get_formatted_page())
-            - body
-              - nav (role="navigation")
-                - a (href="/about")
+            - body-1
+              - nav-1 (role="navigation")
+                - a-1 (href="/about")
                   - "About"
         """
         if format == "markdown":
@@ -151,49 +145,63 @@ class Page:
             raise ValueError(f"Format must be 'markdown' or 'json', got: {format}")
 
     def _to_markdown(self) -> str:
-        """Convert semantic IR to markdown format."""
-        from domcontext._internal.ir.semantic_ir import SemanticElement
+        """Convert node tree to markdown format."""
+        from domnode import Text
 
-        lines = []
-        for node, depth in self._semantic_ir.dfs(with_depth=True):
-            indent = "  " * depth
+        def node_to_markdown(node: Node, indent: int = 0) -> List[str]:
+            lines = []
+            semantic_id = node.metadata.get("semantic_id", "")
 
-            if isinstance(node.data, SemanticElement):
-                elem = node.data
-                # Tag + attributes
-                if elem.semantic_attributes:
-                    attrs = " ".join(f'{k}="{v}"' for k, v in elem.semantic_attributes.items())
-                    lines.append(f"{indent}- {elem.tag} ({attrs})")
-                else:
-                    lines.append(f"{indent}- {elem.tag}")
-            else:
-                # Text node
-                lines.append(f'{indent}- "{node.data.text}"')
+            # Format attributes
+            attrs = []
+            for key, value in node.attrib.items():
+                attrs.append(f'{key}="{value}"')
+            attr_str = f" ({', '.join(attrs)})" if attrs else ""
 
-        return "\n".join(lines)
+            # Add node line
+            prefix = "  " * indent + "- "
+            lines.append(f"{prefix}{semantic_id}{attr_str}")
+
+            # Add children
+            for child in node.children:
+                if isinstance(child, Node):
+                    lines.extend(node_to_markdown(child, indent + 1))
+                elif isinstance(child, Text):
+                    content = child.content.strip()
+                    if content:
+                        text_prefix = "  " * (indent + 1) + "- "
+                        lines.append(f'{text_prefix}"{content}"')
+
+            return lines
+
+        return "\n".join(node_to_markdown(self._root))
 
     def _to_json(self) -> dict:
-        """Convert semantic IR to JSON format."""
-        from domcontext._internal.ir.semantic_ir import SemanticElement, SemanticTreeNode
+        """Convert node tree to JSON format."""
+        from domnode import Text
 
-        def node_to_dict(node: SemanticTreeNode) -> dict:
-            if isinstance(node.data, SemanticElement):
-                return {
-                    'type': 'element',
-                    'tag': node.data.tag,
-                    'attributes': node.data.semantic_attributes,
-                    'children': [node_to_dict(child) for child in node.children]
-                }
-            else:
-                return {
-                    'type': 'text',
-                    'text': node.data.text
-                }
+        def node_to_dict(node: Node) -> dict:
+            result = {
+                'type': 'element',
+                'tag': node.tag,
+                'semantic_id': node.metadata.get('semantic_id'),
+                'attributes': dict(node.attrib),
+                'children': []
+            }
+            for child in node.children:
+                if isinstance(child, Node):
+                    result['children'].append(node_to_dict(child))
+                elif isinstance(child, Text):
+                    result['children'].append({
+                        'type': 'text',
+                        'text': child.content
+                    })
+            return result
 
         return {
-            'root': node_to_dict(self._semantic_ir.root),
-            'total_elements': len(self._semantic_ir.all_element_nodes())
+            'root': node_to_dict(self._root),
+            'total_elements': len(self._id_mapping)
         }
 
     def __repr__(self) -> str:
-        return f"Page(semantic_ir={self._semantic_ir})"
+        return f"Page(elements={len(self._id_mapping)})"

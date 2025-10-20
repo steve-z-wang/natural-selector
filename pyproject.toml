@@ -24,7 +24,7 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
 ]
 dependencies = [
-    "domcontext>=0.1.0",
+    "domnode>=0.2.0",
     "numpy>=1.24.0",
 ]
 

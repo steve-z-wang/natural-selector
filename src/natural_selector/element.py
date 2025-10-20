@@ -2,8 +2,7 @@
 
 from dataclasses import dataclass
 from typing import Optional, Dict
-from domcontext._internal.ir.dom_ir import DomTreeNode, DomElement
-from domcontext._internal.ir.semantic_ir import SemanticElement
+from domnode import Node
 
 
 @dataclass
@@ -16,10 +15,10 @@ class SelectedElement:
     """
 
     element_id: str  # Readable ID like "button-1"
-    dom_tree_node: DomTreeNode  # The DOM tree node (has parent references!)
+    node: Node  # The domnode.Node (has parent references!)
     confidence: float  # Selection confidence score
     rank: int  # Result ranking (1 = top result)
-    id_mapping: Dict[str, SemanticElement]  # Mapping from readable ID to SemanticElement
+    id_mapping: Dict[str, Node]  # Mapping from readable ID to Node
 
     def to_xpath(self) -> str:
         """
@@ -33,7 +32,7 @@ class SelectedElement:
             '(//button[@type="submit"])[1]'
         """
         from ._internal.selectors.xpath import generate_xpath
-        xpath = generate_xpath(self.element_id, self.id_mapping, self.dom_tree_node)
+        xpath = generate_xpath(self.element_id, self.id_mapping, self.node)
         if xpath is None:
             raise ValueError(f"Could not generate XPath for element {self.element_id}")
         return xpath
@@ -51,12 +50,8 @@ class SelectedElement:
         """
         # TODO: Implement CSS selector generation
         # For now, return a basic CSS selector
-        if not isinstance(self.dom_tree_node.data, DomElement):
-            return ""
-
-        element = self.dom_tree_node.data
-        tag = element.tag
-        attrs = element.attributes
+        tag = self.node.tag
+        attrs = self.node.attrib
 
         # Try id first (most specific)
         if 'id' in attrs:
@@ -113,34 +108,18 @@ class SelectedElement:
     @property
     def tag(self) -> str:
         """Element tag name."""
-        if not isinstance(self.dom_tree_node.data, DomElement):
-            return ""
-        return self.dom_tree_node.data.tag
+        return self.node.tag
 
     @property
     def text(self) -> Optional[str]:
         """Element text content."""
-        from domcontext._internal.ir.dom_ir import DomText
-
-        # Collect all text from this node and descendants
-        texts = []
-
-        def collect_text(tree_node: DomTreeNode):
-            if isinstance(tree_node.data, DomText):
-                texts.append(tree_node.data.text.strip())
-            for child in tree_node.children:
-                collect_text(child)
-
-        collect_text(self.dom_tree_node)
-        text = " ".join(texts)
+        text = self.node.get_text()
         return text if text else None
 
     @property
     def attributes(self) -> dict:
         """Element attributes."""
-        if not isinstance(self.dom_tree_node.data, DomElement):
-            return {}
-        return self.dom_tree_node.data.attributes
+        return self.node.attrib
 
     def __repr__(self) -> str:
         return f"SelectedElement(id='{self.element_id}', tag='{self.tag}', rank={self.rank}, confidence={self.confidence:.2f})"

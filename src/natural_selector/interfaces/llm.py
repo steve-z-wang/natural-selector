@@ -17,7 +17,7 @@ class LLM(ABC):
 
         Args:
             query: User's natural language query
-            context: Context text (markdown chunks)
+            context: Context text (element representations from vector search)
             system_prompt: System prompt defining the task
                           (PageIndex provides this for element selection)
 

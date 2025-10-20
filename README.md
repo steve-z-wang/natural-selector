@@ -48,20 +48,21 @@ Natural Selector uses a multi-stage pipeline to find elements:
 - Remove empty nodes and collapse wrapper divs
 - Generate readable IDs (button-1, input-2)
 
-**4. RAG-Based Search**
-- Chunk semantic tree into markdown with element IDs
-- Embed chunks using sentence-transformers
-- Vector search retrieves relevant chunks for query
+**4. Element Embeddings**
+- Generate text representation for each element (tag, attributes, path, siblings, text)
+- Embed each element using sentence-transformers
+- Vector search retrieves top-k most relevant elements for query
 
 **5. LLM Selection**
-- LLM receives top-k chunks with element IDs
+- LLM receives top-k element representations with IDs
 - Returns element ID(s) matching natural language query
-- Generate XPath/CSS selectors from semantic tree
+- Generate XPath/CSS selectors from DOM tree
 
 **Why this approach:**
 - Visibility filtering handles dynamic content (modals, dropdowns)
-- Semantic filtering reduces token usage (removes non-interactive elements)
-- RAG enables querying large DOMs without context limits
+- Semantic filtering reduces noise (removes non-interactive elements)
+- Element-based embeddings enable precise element matching
+- Path and sibling context helps disambiguate similar elements
 - Readable IDs help LLM understand element purpose
 
 ## Features
@@ -69,12 +70,14 @@ Natural Selector uses a multi-stage pipeline to find elements:
 - Natural language queries
 - Multi-pass filtering (captures popups, modals, positioned elements)
 - Guaranteed unique XPath/CSS selectors
-- Handles large DOMs via chunking + RAG
+- Element-based embeddings with context (path + siblings)
+- Handles large DOMs via vector search + RAG
 - Customizable LLMs and embedders
 
 ## Roadmap
 
-- [ ] HTML adapter (alternative to CDP for static HTML)
+- [x] HTML adapter (alternative to CDP for static HTML)
+- [x] Element-based embeddings (migrated from chunk-based)
 - [ ] Test with Mind2Web dataset
 - [ ] Error handling & retry logic (LLM/embedding failures, timeouts)
 - [ ] Selector validation (verify generated selectors work on page)
